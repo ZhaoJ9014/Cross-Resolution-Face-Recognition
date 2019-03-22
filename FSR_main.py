@@ -212,31 +212,33 @@ def test(test_loader, model, criterion, optimizer, epoch, use_cuda):
     count = 0
 
     for batch_idx, [batch_lr_img, batch_sr_img, batch_lbl, batch_landmark] in enumerate(test_loader):
-        # measure data loading time
-        data_time.update(time.time() - end)
-        
-        if use_cuda:
-            batch_lr_img, batch_sr_img, batch_lbl, batch_landmark = batch_lr_img.cuda(), batch_sr_img.cuda(), batch_lbl.cuda(), batch_landmark.cuda()
-        batch_lr_img, batch_sr_img, batch_lbl, batch_landmark = Variable(batch_lr_img), Variable(batch_sr_img), Variable(batch_lbl), Variable(batch_landmark)
-        
-        # compute output
-        coarse_out, out_sr, out_landmark, out_lbl = model(batch_lr_img)
-        loss = criterion(out_sr, batch_sr_img) + criterion(coarse_out, batch_sr_img) + criterion(out_landmark,batch_landmark) + criterion(out_lbl, batch_lbl)
-        
-        # rand_id = random.randint(0,4)
-        count += 1
-        if count%10 ==0:
-            rand_id = random.randint(0, 4)
-            # count = 0
-            random_img, random_landmark, random_parsing = out_sr[0], out_landmark[0], out_lbl[0]
-            random_img, random_landmark, random_parsing = random_img.detach().cpu().numpy(), random_landmark.detach().cpu().numpy(), random_parsing.detach().cpu().numpy()
-            visualize.save_image(random_img, random_landmark, random_parsing, epoch,if_train=False,count=int(count/200))
-        
-        losses.update(loss.data, batch_lr_img.size(0))
-        
-        # measure elapsed time
-        batch_time.update(time.time() - end)
-        end = time.time()
+        with torch.no_grad():
+    
+            # measure data loading time
+            data_time.update(time.time() - end)
+            
+            if use_cuda:
+                batch_lr_img, batch_sr_img, batch_lbl, batch_landmark = batch_lr_img.cuda(), batch_sr_img.cuda(), batch_lbl.cuda(), batch_landmark.cuda()
+            batch_lr_img, batch_sr_img, batch_lbl, batch_landmark = Variable(batch_lr_img), Variable(batch_sr_img), Variable(batch_lbl), Variable(batch_landmark)
+            
+            # compute output
+            coarse_out, out_sr, out_landmark, out_lbl = model(batch_lr_img)
+            loss = criterion(out_sr, batch_sr_img) + criterion(coarse_out, batch_sr_img) + criterion(out_landmark,batch_landmark) + criterion(out_lbl, batch_lbl)
+            
+            # rand_id = random.randint(0,4)
+            count += 1
+            if count%10 ==0:
+                rand_id = random.randint(0, 4)
+                # count = 0
+                random_img, random_landmark, random_parsing = out_sr[0], out_landmark[0], out_lbl[0]
+                random_img, random_landmark, random_parsing = random_img.detach().cpu().numpy(), random_landmark.detach().cpu().numpy(), random_parsing.detach().cpu().numpy()
+                visualize.save_image(random_img, random_landmark, random_parsing, epoch,if_train=False,count=int(count/200))
+            
+            losses.update(loss.data, batch_lr_img.size(0))
+            
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
         
         # plot progress
         bar.suffix = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Loss: {loss:.4f}'.format(
