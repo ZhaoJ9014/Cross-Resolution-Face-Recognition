@@ -7,6 +7,7 @@ import numpy as np
 from .misc import *
 from helen_loader import HelenLoader as helenloader
 from PIL import Image
+from helen_loader import HelenLoader
 
 import os
 import scipy.misc as m
@@ -14,21 +15,52 @@ import pdb
 
 # __all__ = ['make_image', 'show_batch', 'show_mask', 'show_mask_single']
 
-def save_image(image,landmark,parsing,epoch,if_train,count):
-    root = '/home/hyo/Projects/GAN/face_distill/results/'
+def save_image(coarse_image=None,image=None,landmark=None,parsing=None,epoch=0,if_train=True,count=0):
+    root = './results/'
     if if_train:
         flag = 'train_epoch_'
     else:
         flag = 'test_epoch_'
     img_name = flag + str(epoch) +'_'+str(count)+ '_HR_Image.jpg'
     parsing_name = flag + str(epoch) +'_'+str(count)+ '_Parsing_Map.jpg'
+    landmark_name = flag + str(epoch) + '_' +str(count) + '_Landmark.jpg'
+    coarse_name = flag+str(epoch) + '_' + str(count) + '_Coarse.jpg'
     # image.convert('RGB').save(os.path.join(root,))
-    image = m.toimage(image)
-    image.save(os.path.join(root,img_name))
-    h = helenloader()
-    parsing_map = h.decode_segmap(parsing[0])
+    # landmark = np.array(landmark).reshape(-1,2)
+    if image is None:
+        pass
+    else:
+        image = m.toimage(image)
+        image.save(os.path.join(root,img_name))
+    if coarse_image is None:
+        pass
+    else:
+        coarse = m.toimage(coarse_image)
+        coarse.save(os.path.join(root,coarse_name))
+    #fig1 = plt.figure()
     # pdb.set_trace()
-    plt.imsave(os.path.join(root,parsing_name),parsing_map)
+    #plt.imshow(image)
+    #plt.scatter(landmark[:,0],landmark[:,1],s=5,c='r')
+    #plt.savefig(os.path.join(root,landmark_name))
+    # plt.imshow(image)
+    # pdb.set_trace()
+    # landmark = m.toimage(landmark[0])
+    # landmark.save(os.path.join(root,landmark_name))
+    if landmark is None:
+        pass
+    else:
+        h = HelenLoader()
+        # landmark =  
+        hm = np.sum(landmark,axis = 0) 
+        plt.imshow(hm)
+        plt.savefig(os.path.join(root,landmark_name))
+    if parsing is None:
+        pass
+    else:
+        h = helenloader()
+        parsing_map = h.decode_segmap(parsing)
+        # pdb.set_trace()
+        plt.imsave(os.path.join(root,parsing_name),parsing_map)
     
     
 # functions to show an image

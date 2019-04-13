@@ -14,7 +14,7 @@ class _Residual_Block(nn.Module):
         
         self.conv1 = nn.Conv2d(in_channels=in_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1,bias=False)
         self.in1 = nn.BatchNorm2d(out_channels,affine=True)
-        self.relu = nn.LeakyReLU(0.2,inplace=True)
+        self.relu = nn.ReLU()
         self.conv2 = nn.Conv2d(in_channels=out_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1,bias=False)
         self.in2 = nn.BatchNorm2d(out_channels,affine=True)
         
@@ -23,6 +23,7 @@ class _Residual_Block(nn.Module):
         out = self.relu(self.in1(self.conv1(x)))
         out = self.in2(self.conv2(out))
         out = torch.add(out,identity_data)
+        out = self.relu(out)
         return out
 
 class Bottleneck(nn.Module):
@@ -196,17 +197,17 @@ def hg2(**kwargs):
                          num_classes=kwargs['num_classes'])
     return model
 
-class _Course_SR_Network(nn.Module):
+class Course_SR_Network(nn.Module):
     def __init__(self):
-        super(_Course_SR_Network,self).__init__()
+        super(Course_SR_Network,self).__init__()
         
-        self.conv_input = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
+        self.conv_input = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=True)
         
-        self.relu = nn.LeakyReLU(0.2,inplace=True)
+        self.relu = nn.ReLU()
         
         self.residual = self.make_layer(_Residual_Block,3,out_channel=64)
-        
-        self.conv_mid = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.dropout = nn.Dropout2d(p=0.5,inplace=True)
+        self.conv_mid = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=True)
         self.bn_mid = nn.BatchNorm2d(64,affine=True)
         
     def make_layer(self,block,num_of_layer,out_channel):
@@ -217,23 +218,26 @@ class _Course_SR_Network(nn.Module):
     
     def forward(self, x):
         out = self.relu(self.bn_mid(self.conv_input(x)))
+        out = self.dropout(out)
+        out = self.residual(out)
         out = self.residual(out)
         # out = self.residual(out)
         # out = self.residual(out)
-        out = self.conv_mid(out)
+        #out = self.residual(out)
+        out_coarse = self.conv_mid(out)
         
-        return out
+        return out,out_coarse
     
-class _Fine_SR_Encoder(_Course_SR_Network):
+class Fine_SR_Encoder(Course_SR_Network):
     def __init__(self):
-        super(_Fine_SR_Encoder,self).__init__()
-        self.conv_input = nn.Conv2d(in_channels=3, out_channels=64, kernel_size=3, stride=2, padding=1, bias=False)
-        self.relu = nn.LeakyReLU(0.2, inplace=True)
+        super(Fine_SR_Encoder,self).__init__()
+        self.conv_input = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=2, padding=1, bias=True)
+        self.relu = nn.ReLU()
         self.bn_mid = nn.BatchNorm2d(64, affine=True)
         
         self.residual = self.make_layer(_Residual_Block,3,out_channel=64)
         
-        self.conv_end = nn.Conv2d(in_channels=64,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
+        self.conv_end = nn.Conv2d(in_channels=64,out_channels=64,kernel_size=3,stride=1,padding=1,bias=True)
     
     def make_layer(self,block,num_of_layer,out_channel):
         layers = []
@@ -243,36 +247,40 @@ class _Fine_SR_Encoder(_Course_SR_Network):
     
     def forward(self,x):
         out = self.relu(self.bn_mid(self.conv_input(x)))
-        
+        out = self.dropout(out)
         # 12 residual blocks
         out = self.residual(out)
+        out = self.dropout(out)
         out = self.residual(out)
         out = self.residual(out)
+        out = self.residual(out)
         # out = self.residual(out)
         # out = self.residual(out)
         # out = self.residual(out)
         # out = self.residual(out)
         # out = self.residual(out)
         # out = self.residual(out)
-        # out = self.residual(out)
-        # out = self.residual(out)
+        #out = self.residual(out)
         # out = self.residual(out)
 
         out = self.relu(self.bn_mid(self.conv_end(out)))
         
         return out
     
-class _Prior_Estimation_Network(nn.Module):
+class Prior_Estimation_Network(nn.Module):
     def __init__(self):
-        super(_Prior_Estimation_Network,self).__init__()
-        self.conv = nn.Conv2d(in_channels=3,out_channels=128,kernel_size=7,stride=2,padding=3,bias=False)
+        super(Prior_Estimation_Network,self).__init__()
+        self.conv = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=7,stride=2,padding=3,bias=True)
         self.bn = nn.BatchNorm2d(128,affine=True)
-        self.relu = nn.LeakyReLU(0.2,inplace=True)
+        self.relu = nn.ReLU()
         self.residual = self.make_layer(_Residual_Block,3,out_channel=128,in_channel=128)
         self.residual_next = self.make_layer(_Residual_Block,3,out_channel=128,in_channel=128)
-        self.hg = Hourglass(planes=64,depth=4,block=Bottleneck,num_blocks=4)
-        self.fc = nn.Conv2d(in_channels=128, out_channels=1, kernel_size=1, bias=True)
-        self.landmark_fc = nn.Linear(in_features=112*112,out_features=194*2)
+        self.hg = Hourglass(planes=64,depth=4,block=Bottleneck,num_blocks=2)
+        self.dropout = nn.Dropout2d(p=0.5,inplace=True)
+        self.fc = nn.Conv2d(in_channels=128, out_channels=11, kernel_size=1, bias=True)
+        self.fc_landmark = nn.Conv2d(in_channels=128,out_channels=97,kernel_size=1,bias=True)
+        # self.fc_landmark1 = nn.Conv2d(in_channels=128,out_channels=128,kernel_size=1,bias=False)
+        # self.landmark_fc = nn.Linear(in_features=112*112*11,out_features=194*2)
 
 
     def make_layer(self, block, num_of_layer,in_channel, out_channel):
@@ -283,31 +291,34 @@ class _Prior_Estimation_Network(nn.Module):
     
     def forward(self, x):
         out = self.relu(self.bn(self.conv(x)))
-        
+        out = self.dropout(out)
         out = self.residual(out)
+        out = self.dropout(out)
         out = self.residual_next(out)
         # out = self.residual_next(out)
-        out = self.hg(out)
+        # out = self.hg(out)
+        
         out = self.hg(out)      # planes = 128
         parsing_out = self.fc(out)
-        landmark_out = self.fc(out)
-        landmark_out = landmark_out.view(landmark_out.size(0), -1)
-        landmark_out = self.landmark_fc(landmark_out)
+        # landmark_out = self.fc_landmark1(out)
+        landmark_out = self.fc_landmark(out)
+        # landmark_out = landmark_out.view(landmark_out.size(0), -1)
+        # landmark_out = self.landmark_fc(landmark_out)
         # landmark_out = self.fc(landmark_out)
         return out,landmark_out,parsing_out
         
-class _Fine_SR_Decoder(nn.Module):
+class Fine_SR_Decoder(nn.Module):
     def __init__(self):
-        super(_Fine_SR_Decoder,self).__init__()
+        super(Fine_SR_Decoder,self).__init__()
         
-        self.conv_input = nn.Conv2d(in_channels=192,out_channels=64,kernel_size=3,stride=1,padding=1,bias=False)
-        self.relu = nn.LeakyReLU(0.2,inplace=True)
-        self.bn_mid = nn.InstanceNorm2d(64,affine=True)
+        self.conv_input = nn.Conv2d(in_channels=192,out_channels=64,kernel_size=3,stride=1,padding=1,bias=True)
+        self.relu = nn.ReLU()
+        self.bn_mid = nn.BatchNorm2d(64,affine=True)
         
-        self.deconv = nn.ConvTranspose2d(in_channels=64,out_channels=64,kernel_size=3,stride=2,bias=False,padding=1,output_padding=1)
+        self.deconv = nn.ConvTranspose2d(in_channels=64,out_channels=64,kernel_size=3,stride=2,bias=True,padding=1,output_padding=1)
         self.residual = self.make_layer(_Residual_Block, 3,out_channel=64)
-        
-        self.conv_out = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=False)
+        self.dropout = nn.Dropout2d(p=0.5,inplace=True)
+        self.conv_out = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=True)
 
     def make_layer(self,block,num_of_layer,out_channel):
         layers = []
@@ -317,10 +328,11 @@ class _Fine_SR_Decoder(nn.Module):
     
     def forward(self, x):
         out = self.relu(self.bn_mid(self.conv_input(x)))
+        out = self.dropout(out)
         out = self.relu(self.bn_mid(self.deconv(out)))
-        
+        # out = self.dropout(out)
         out = self.residual(out)
-        # out = self.residual(out)
+        out = self.residual(out)
         # out = self.residual(out)
         
         out = self.conv_out(out)
@@ -329,18 +341,23 @@ class _Fine_SR_Decoder(nn.Module):
 class OverallNetwork(nn.Module):
     def __init__(self):
         super(OverallNetwork,self).__init__()
-        self._coarse_sr_network = _Course_SR_Network()
-        self._prior_estimation_network = _Prior_Estimation_Network()
-        self._fine_sr_encoder = _Fine_SR_Encoder()
-        self._fine_sr_decoder = _Fine_SR_Decoder()
-        self.deconv = nn.ConvTranspose2d(in_channels=1,out_channels=1,kernel_size=3,stride=2,bias=False,padding=1,output_padding=1)
+        self._coarse_sr_network = Course_SR_Network()
+        self._prior_estimation_network = Prior_Estimation_Network()
+        self._fine_sr_encoder = Fine_SR_Encoder()
+        self._fine_sr_decoder = Fine_SR_Decoder()
+        self.softmax = nn.Softmax()
+        # self.deconv = nn.ConvTranspose2d(in_channels=16,out_channels=11,kernel_size=3,stride=2,bias=False,padding=1,output_padding=1)
     def forward(self,x):
-        coarse_out = self._coarse_sr_network(x)
-        out_sr = self._fine_sr_encoder(coarse_out)
-        out_pe,landmark_out,parsing_out = self._prior_estimation_network(coarse_out)
-        parsing_out = self.deconv(parsing_out)
-        out = torch.cat((out_sr,out_pe),1)
+        out,coarse_out = self._coarse_sr_network(x)
+        out_sr = self._fine_sr_encoder(out)
+        out_pe,landmark_out,parsing_out = self._prior_estimation_network(out)
+        #landmark_out = self.softmax(landmark_out)
+        #parsing_out = self.deconv(parsing_out)
+        # out = torch.cat((out_sr,landmark_out),1)
+        # out = torch.cat((out,parsing_out),1)
+        out = torch.cat((out_pe,out_sr),1)
         out = self._fine_sr_decoder(out)
+        # pdb.set_trace()
         return coarse_out,out,landmark_out,parsing_out
     
 if __name__=='__main__':

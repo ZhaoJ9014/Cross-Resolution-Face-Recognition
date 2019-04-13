@@ -9,9 +9,12 @@ import glob
 import os
 import scipy.io as io
 import scipy.misc as m
+import math
 import matplotlib.pyplot as plt
+import random
+import math
 
-from PIL import Image
+from PIL import Image,ImageEnhance
 from tqdm import trange
 from os.path import join as pjoin
 
@@ -23,20 +26,20 @@ class HelenLoader(data.Dataset):
     """
     def __init__(
             self,
-            parsing_root='/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original/labels_aligned/',
-            target_path='/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original/Segmentation/',
-            helen_root='/media/hyo/文档/Dataset/',
-            landmark_root='/home/hyo/xixixi.csv',
+            # parsing_root='./face_dataset/SmithCVPR2013_dataset_original/labels_aligned/',
+            target_path='/media/hyo/文档/Dataset/face_dataset_v2/SmithCVPR2013_dataset_original/Segmentation/',
+            helen_root='/media/hyo/文档/Dataset/face_dataset_v2/',
+            landmark_root='/media/hyo/文档/Dataset/face_dataset_v2/xixixi_v2.csv',
             is_transform=False,
             img_size=224,
-            split = 'train',
+            split = 'train_no_rotate',
             img_norm=True,
             
             test_mode=False):
         
         self.helen_root = helen_root
         self.target_path = target_path
-        self.parsing_root = parsing_root
+        # self.parsing_root = parsing_root
         self.test_mode = test_mode
         self.landmark_root = landmark_root
         self.n_classes = 11
@@ -57,7 +60,7 @@ class HelenLoader(data.Dataset):
         # self.files 是一个dict，格式为{‘train’：[img1_name , img2_name , ...] , 'val':[... , ... , ...]}
         # 无jpg或png等后缀
         if not self.test_mode:
-            for split in ['train','test']:
+            for split in ['train_no_rotate','test_no_rotate']:
                 path = pjoin(self.helen_root,split+'.txt')
                 file_list = tuple(open(path,'r'))
                 self.files[split] = file_list
@@ -68,20 +71,77 @@ class HelenLoader(data.Dataset):
     def __getitem__(self, index):
         # 需要返回的是lr和hr图片对/landmark坐标/parsing map
         img_name = self.files[self.split][index]        # train image name or test image name
-        # lr image
-        lr_img = Image.open(pjoin(self.helen_root,'Helen_aligned_28',self.split,img_name.strip('\n')+'.jpg'))
-        # SR image
-        sr_img = Image.open(pjoin(self.helen_root,'Helen_aligned',self.split,img_name.strip('\n')+'.jpg'))
-        # parsing map
 
-        parsing = Image.open(pjoin(self.target_path,img_name.strip('\n')+'.png'))
-        # landmark
-        id = pjoin(self.helen_root,'Helen_aligned',self.split,img_name.strip('\n')+'.jpg')
-        landmark = self.df[self.df['img_name']==id].values[0][2:]
-        if self.is_transform:
-            lr_img,sr_img,parsing,landmark = self.transform(lr_img,sr_img,parsing,landmark)
-        return [lr_img,sr_img,parsing,landmark]
+        random_angle = random.uniform(-10,10)
+        random_contrast = random.uniform(0.8,1.2)
+        random_brightness = random.uniform(0.6, 1.4)
+        random_sharpness = random.uniform(0.8, 1.2)
+        # lr image
+        lr_img = Image.open(pjoin(self.helen_root,'Helen_aligned_28_renew',img_name.strip('\n')))
+        lr_img = lr_img.rotate(random_angle)
         
+        contrast = ImageEnhance.Contrast(lr_img)
+        lr_img = contrast.enhance(random_contrast)
+
+        brightness = ImageEnhance.Contrast(lr_img)
+        lr_img = brightness.enhance(random_brightness)
+        
+        sharpness = ImageEnhance.Contrast(lr_img)
+        lr_img = sharpness.enhance(random_sharpness)
+        
+        # SR image
+        sr_img = Image.open(pjoin(self.helen_root,'Helen_aligned_224_renew',img_name.strip('\n')))
+        sr_img = sr_img.rotate(random_angle)
+
+        contrast = ImageEnhance.Contrast(sr_img)
+        sr_img = contrast.enhance(random_contrast)
+
+        brightness = ImageEnhance.Contrast(sr_img)
+        sr_img = brightness.enhance(random_brightness)
+
+        sharpness = ImageEnhance.Contrast(sr_img)
+        sr_img = sharpness.enhance(random_sharpness)
+        
+        # parsing map
+        parsing = Image.open(pjoin(self.target_path,img_name.strip('\n').split('.')[0]+'.png')).resize((112,112))
+        parsing = parsing.rotate(random_angle)
+        # landmark
+        idd = img_name.strip('\n')
+        landmark = self.df[self.df['img_name']==idd].values[0][2:].reshape(-1,2)/2.0
+        landmark1 = []
+        n = np.shape(landmark)[0]
+        for i in range(n):
+            if i%2==0:
+                landmark[i,:] = np.dot(self.rotate_matrix(-random_angle),landmark[i,:]-56)+56
+                landmark1.append(landmark[i,:])
+
+        hm = self.generate_hm(height=112,width=112,landmark=landmark1,s=1.3)
+        # pdb.set_trace()
+        if self.is_transform:
+            lr_img,sr_img,parsing,hm = self.transform(lr_img,sr_img,parsing,hm)
+        return [lr_img,sr_img,parsing,hm]
+
+    def gaussian_k(self,x0,y0,sigma,width=224,height=224):
+        """
+        Make a suqare gaussian kernel centered at (x0,y0) with sigma.
+        """        
+        x = np.arange(0,width,1,float)
+        y = np.arange(0,height,1,float)[:,np.newaxis]
+        return np.exp(-((x-x0)**2 + (y-y0)**2) / (2 * sigma**2))
+
+    def generate_hm(self,height,width,landmark,s=1.0):
+        # Generate a full heatmap for every landmarks in an array.
+        # pdb.set_trace()
+        N = np.shape(landmark)[0]
+        # hm = np.zeros((N,height,width),dtype=np.float32)
+        # for i in range(N):
+        #     hm[i,:,:] = self.gaussian_k(landmark[i][0],landmark[i][1],s,height,width)
+        hm = np.zeros((height,width),dtype=np.float32)
+        for i in range(N):
+            hm += self.gaussian_k(landmark[i][0], landmark[i][1], sigma=s,height=height,width=width)
+            # hm += self.gaussian_k((landmark[i,0], landmark[i,1], s, height, width))
+        return hm
+
         
     def transform(self, lr_img,sr_img, lbl,landmark):
         # if self.img_size == ("same", "same"):
@@ -92,7 +152,7 @@ class HelenLoader(data.Dataset):
         lr_img = self.tf(lr_img)
         sr_img = self.tf(sr_img)
         lbl = torch.from_numpy(np.expand_dims(np.array(lbl),axis=0)).long()
-        landmark = torch.from_numpy(landmark.astype(np.float32)).long()
+        landmark = torch.from_numpy(landmark.astype(np.float32))
         lbl[lbl == 255] = 0
         return lr_img,sr_img, lbl,landmark
     
@@ -154,13 +214,16 @@ class HelenLoader(data.Dataset):
             (np.ndarray, optional): the resulting decoded color image.
         """
         label_colours = self.get_pascal_labels()
-
+        # pdb.set_trace()
+        #label_mask = label.max(dim=0)[1]
+        label_mask1 = label_mask.astype(int)
+        '''
         label_mask1 = label_mask / (label_mask.max() - label_mask.min()) * 11.0
         # pdb.set_trace()
         if label_mask1.min() < 0:
             label_mask1 = label_mask1 - label_mask1.min()
         label_mask1 = label_mask1.astype(int)
-        
+        '''
         
         r = label_mask1.copy()
         g = label_mask1.copy()
@@ -196,7 +259,7 @@ class HelenLoader(data.Dataset):
             lbl_new = m.toimage(result,high=result.max(),low=result.min())
             temp = np.array(lbl_new)
             print(img_name)
-            m.imsave(pjoin('/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original','Segmentation',img_name),lbl_new)
+            m.imsave(pjoin('./face_dataset/SmithCVPR2013_dataset_original','Segmentation',img_name),lbl_new)
         
         # for img in os.listdir(pjoin('/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original','Segmentation')):
         #     img_path = pjoin('/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original','Segmentation',img)
@@ -204,11 +267,21 @@ class HelenLoader(data.Dataset):
         #     lbl = m.toimage(lbl, high=lbl.max(), low=lbl.min())
         #     print('xixixixixi',img)
         #     m.imsave(pjoin(target_path,img), lbl)
+
+    # get affine matrix
+    def rotate_matrix(self,angle):
+        angle = angle/180.0*math.pi
+        matrix = [[math.cos(angle),-math.sin(angle)],[math.sin(angle),math.cos(angle)]]
+        return matrix
+
             
 if __name__=='__main__':
     h = HelenLoader()
     # h.setup_annotation()
-    labelmask = np.array(Image.open('/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original/Segmentation/2268738156_1.png'))
+    parsing_img = Image.open('/media/hyo/文档/Dataset/face_dataset/SmithCVPR2013_dataset_original/Segmentation/2268738156_1.png')
+    random_angle = random.randint(-100, 1)
+    parsing_img = parsing_img.rotate(random_angle)
+    labelmask = np.array(parsing_img)
     h.decode_segmap(labelmask,plot=True)
     
     

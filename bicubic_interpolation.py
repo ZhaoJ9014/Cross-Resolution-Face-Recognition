@@ -175,7 +175,7 @@ def rotate_img_name(img_name,angle,if_flip=False):
     return new_img_name
     
     
-root = '/media/hyo/文档/Dataset/Helen_aligned_28'
+root = '/media/hyo/文档/Dataset/Helen_aligned_28_renew'
 dir_list = os.listdir(root)
 for dir in dir_list:
     image_dir = os.path.join(root,dir)
@@ -183,12 +183,12 @@ for dir in dir_list:
     for image in image_list:
         img_loc = os.path.join(image_dir,image)
 
-        img = np.array(Image.open(img_loc))
-        zoom = BiCubic_interpolation(img, 224, 224)
-        # zoom = img.resize((224,224),Image.ANTIALIAS)
-        zoom1 = Image.fromarray(zoom.astype('uint8')).convert('RGB')
-        zoom1 = zoom1.filter((ImageFilter.GaussianBlur(radius=2.7)))
-        zoom1.save(img_loc)
+        img = Image.open(img_loc)
+        # zoom = BiCubic_interpolation(img, 224, 224)
+        zoom = img.resize((224,224),Image.BICUBIC)
+        # zoom1 = Image.fromarray(zoom.astype('uint8')).convert('RGB')
+        # zoom1 = zoom1.filter((ImageFilter.GaussianBlur(radius=2.7)))
+        zoom.save(img_loc)
         print(img_loc)
 #
 #         img = cv2.imread(img_loc)
