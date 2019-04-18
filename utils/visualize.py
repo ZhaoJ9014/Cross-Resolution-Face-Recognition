@@ -15,7 +15,7 @@ import pdb
 
 # __all__ = ['make_image', 'show_batch', 'show_mask', 'show_mask_single']
 
-def save_image(coarse_image=None,image=None,landmark=None,parsing=None,epoch=0,if_train=True,count=0):
+def save_image(coarse_image=None,image=None,landmark=None,parsing=None,lr_img=None,sr_img=None,epoch=0,if_train=True,count=0):
     root = './results/'
     if if_train:
         flag = 'train_epoch_'
@@ -25,6 +25,8 @@ def save_image(coarse_image=None,image=None,landmark=None,parsing=None,epoch=0,i
     parsing_name = flag + str(epoch) +'_'+str(count)+ '_Parsing_Map.jpg'
     landmark_name = flag + str(epoch) + '_' +str(count) + '_Landmark.jpg'
     coarse_name = flag+str(epoch) + '_' + str(count) + '_Coarse.jpg'
+    lr_img_name = flag+str(epoch) + '_' + str(count) + '_lr_origin.jpg'
+    sr_img_name = flag+str(epoch) + '_' + str(count) + '_sr_origin.jpg'
     # image.convert('RGB').save(os.path.join(root,))
     # landmark = np.array(landmark).reshape(-1,2)
     if image is None:
@@ -61,6 +63,18 @@ def save_image(coarse_image=None,image=None,landmark=None,parsing=None,epoch=0,i
         parsing_map = h.decode_segmap(parsing)
         # pdb.set_trace()
         plt.imsave(os.path.join(root,parsing_name),parsing_map)
+        
+    if lr_img is None:
+        pass
+    else:
+        lr_img1 = m.toimage(lr_img)
+        lr_img1.save(os.path.join(root,lr_img_name))
+        
+    if sr_img is None:
+        pass
+    else:
+        sr_img1 = m.toimage(sr_img)
+        sr_img1.save(os.path.join(root,sr_img_name))
     
     
 # functions to show an image
