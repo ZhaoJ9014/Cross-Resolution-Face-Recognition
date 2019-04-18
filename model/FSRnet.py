@@ -13,10 +13,10 @@ class _Residual_Block(nn.Module):
         super(_Residual_Block,self).__init__()
         
         self.conv1 = nn.Conv2d(in_channels=in_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1,bias=False)
-        self.in1 = nn.BatchNorm2d(out_channels,affine=True)
+        self.in1 = nn.InstanceNorm2d(out_channels,affine=True)
         self.relu = nn.ReLU()
         self.conv2 = nn.Conv2d(in_channels=out_channels,out_channels=out_channels,kernel_size=3,stride=1,padding=1,bias=False)
-        self.in2 = nn.BatchNorm2d(out_channels,affine=True)
+        self.in2 = nn.InstanceNorm2d(out_channels,affine=True)
         
     def forward(self, x):
         identity_data = x
@@ -32,12 +32,12 @@ class Bottleneck(nn.Module):
     def __init__(self, inplanes=128, planes=128, stride=1, downsample=None):
         super(Bottleneck, self).__init__()
 
-        self.bn1 = nn.BatchNorm2d(inplanes)
+        self.bn1 = nn.InstanceNorm2d(inplanes)
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=True)
-        self.bn2 = nn.BatchNorm2d(planes)
+        self.bn2 = nn.InstanceNorm2d(planes)
         self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
                                padding=1, bias=True)
-        self.bn3 = nn.BatchNorm2d(planes)
+        self.bn3 = nn.InstanceNorm2d(planes)
         self.conv3 = nn.Conv2d(planes, planes * 2, kernel_size=1, bias=True)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
@@ -117,7 +117,7 @@ class HourglassNet(nn.Module):
         self.num_stacks = num_stacks
         self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3,
                                bias=True)
-        self.bn1 = nn.BatchNorm2d(self.inplanes)
+        self.bn1 = nn.InstanceNorm2d(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.layer1 = self._make_residual(block, self.inplanes, 1)
         self.layer2 = self._make_residual(block, self.inplanes, 1)
@@ -159,7 +159,7 @@ class HourglassNet(nn.Module):
         return nn.Sequential(*layers)
 
     def _make_fc(self, inplanes, outplanes):
-        bn = nn.BatchNorm2d(inplanes)
+        bn = nn.InstanceNorm2d(inplanes)
         conv = nn.Conv2d(inplanes, outplanes, kernel_size=1, bias=True)
         return nn.Sequential(
                 conv,
@@ -203,12 +203,12 @@ class Course_SR_Network(nn.Module):
         
         self.conv_input = nn.Conv2d(in_channels=3,out_channels=64,kernel_size=3,stride=1,padding=1,bias=True)
         
-        self.relu = nn.ReLU()
+        self.relu = nn.PReLU(64)
         
         self.residual = self.make_layer(_Residual_Block,3,out_channel=64)
         self.dropout = nn.Dropout2d(p=0.5,inplace=True)
         self.conv_mid = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=True)
-        self.bn_mid = nn.BatchNorm2d(64,affine=True)
+        self.bn_mid = nn.InstanceNorm2d(64,affine=True)
         
     def make_layer(self,block,num_of_layer,out_channel):
         layers = []
@@ -232,8 +232,8 @@ class Fine_SR_Encoder(Course_SR_Network):
     def __init__(self):
         super(Fine_SR_Encoder,self).__init__()
         self.conv_input = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=2, padding=1, bias=True)
-        self.relu = nn.ReLU()
-        self.bn_mid = nn.BatchNorm2d(64, affine=True)
+        self.relu = nn.PReLU(64)
+        self.bn_mid = nn.InstanceNorm2d(64, affine=True)
         
         self.residual = self.make_layer(_Residual_Block,3,out_channel=64)
         
@@ -271,8 +271,8 @@ class Prior_Estimation_Network(nn.Module):
     def __init__(self):
         super(Prior_Estimation_Network,self).__init__()
         self.conv = nn.Conv2d(in_channels=64,out_channels=128,kernel_size=7,stride=2,padding=3,bias=True)
-        self.bn = nn.BatchNorm2d(128,affine=True)
-        self.relu = nn.ReLU()
+        self.bn = nn.InstanceNorm2d(128,affine=True)
+        self.relu = nn.PReLU(128)
         self.residual = self.make_layer(_Residual_Block,3,out_channel=128,in_channel=128)
         self.residual_next = self.make_layer(_Residual_Block,3,out_channel=128,in_channel=128)
         self.hg = Hourglass(planes=64,depth=4,block=Bottleneck,num_blocks=2)
@@ -312,14 +312,15 @@ class Fine_SR_Decoder(nn.Module):
         super(Fine_SR_Decoder,self).__init__()
         
         self.conv_input = nn.Conv2d(in_channels=192,out_channels=64,kernel_size=3,stride=1,padding=1,bias=True)
-        self.relu = nn.ReLU()
-        self.bn_mid = nn.BatchNorm2d(64,affine=True)
+        self.relu = nn.PReLU(64)
+        self.bn_mid = nn.InstanceNorm2d(64,affine=True)
         
         self.deconv = nn.ConvTranspose2d(in_channels=64,out_channels=64,kernel_size=3,stride=2,bias=True,padding=1,output_padding=1)
         self.residual = self.make_layer(_Residual_Block, 3,out_channel=64)
         self.dropout = nn.Dropout2d(p=0.5,inplace=True)
         self.conv_out = nn.Conv2d(in_channels=64,out_channels=3,kernel_size=3,stride=1,padding=1,bias=True)
-
+        self.instance_norm = nn.InstanceNorm2d(3,affine=True)
+        
     def make_layer(self,block,num_of_layer,out_channel):
         layers = []
         for _ in range(num_of_layer):
@@ -328,7 +329,7 @@ class Fine_SR_Decoder(nn.Module):
     
     def forward(self, x):
         out = self.relu(self.bn_mid(self.conv_input(x)))
-        out = self.dropout(out)
+        # out = self.dropout(out)
         out = self.relu(self.bn_mid(self.deconv(out)))
         # out = self.dropout(out)
         out = self.residual(out)
@@ -336,6 +337,7 @@ class Fine_SR_Decoder(nn.Module):
         # out = self.residual(out)
         
         out = self.conv_out(out)
+        # out = self.instance_norm(out)
         return out
         
 class OverallNetwork(nn.Module):

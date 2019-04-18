@@ -73,9 +73,9 @@ class HelenLoader(data.Dataset):
         img_name = self.files[self.split][index]        # train image name or test image name
 
         random_angle = random.uniform(-10,10)
-        random_contrast = random.uniform(0.8,1.2)
-        random_brightness = random.uniform(0.6, 1.4)
-        random_sharpness = random.uniform(0.8, 1.2)
+        random_contrast = random.uniform(0.9,1.1)
+        random_brightness = random.uniform(0.8, 1.2)
+        random_sharpness = random.uniform(0.9, 1.1)
         # lr image
         lr_img = Image.open(pjoin(self.helen_root,'Helen_aligned_28_renew',img_name.strip('\n')))
         lr_img = lr_img.rotate(random_angle)
@@ -278,9 +278,9 @@ class HelenLoader(data.Dataset):
 if __name__=='__main__':
     h = HelenLoader()
     # h.setup_annotation()
-    parsing_img = Image.open('/media/hyo/文档/Dataset/face_dataset/SmithCVPR2013_dataset_original/Segmentation/2268738156_1.png')
-    random_angle = random.randint(-100, 1)
-    parsing_img = parsing_img.rotate(random_angle)
+    parsing_img = Image.open('/media/hyo/文档/Dataset/face_dataset_v2/SmithCVPR2013_dataset_original/Segmentation/10405146_1.png')
+    random_angle = random.randint(-1, 1)
+    parsing_img = parsing_img.rotate(0)
     labelmask = np.array(parsing_img)
     h.decode_segmap(labelmask,plot=True)
     

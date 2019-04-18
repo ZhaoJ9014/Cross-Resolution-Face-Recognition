@@ -46,15 +46,15 @@ def generate_hm(height, width, landmarks, s=1.2):
     return hm
 
 if __name__=='__main__':
-    df = pd.read_csv('/home/hyo/xixixi.csv')
-    idd = '/media/hyo/文档/Dataset/Helen_aligned/train/2376488496_1.jpg'
+    df = pd.read_csv('/home/hyo/xixixi_v2.csv')
+    idd = '10405146_1.jpg'
     landmark = df[df['img_name'] == idd].values[0][2:].reshape(-1,2)/2.0
     landmark1 = []
     n = np.shape(landmark)[0]
-    for i in range(n):
-        if i%2==0:
-            landmark1.append(landmark[i,:])
-    hm = generate_hm(112,112,landmark1,s=1.5)
+    # for i in range(n):
+    #     if i%2==0:
+    #         landmark1.append(landmark[i,:])
+    hm = generate_hm(112,112,landmark,s=1.0)
     # plt.imshow(np.sum(hm,axis=0))
     plt.imshow(hm)
     plt.show()

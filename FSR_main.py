@@ -44,15 +44,17 @@ def weights_init(m):
     '''
     for each in m.modules():
         if isinstance(each,nn.Conv2d):
-            n = each.kernel_size[0] * each.kernel_size[1] * each.out_channels
-            each.weight.data.normal_(0,math.sqrt(2.0/n))
+            nn.init.xavier_uniform_(each.weight.data)
             if each.bias is not None:
                 each.bias.data.zero_()
         elif isinstance(each,nn.BatchNorm2d):
             each.weight.data.fill_(1)
             each.bias.data.zero_()
+        # elif isinstance(each,nn.InstanceNorm2d):
+        #     each.weight.data.fill_(1)
+        #     each.bias.data.zero_()
         elif isinstance(each,nn.Linear):
-            each.weight.data.normal_(0,0.01)
+            nn.init.xavier_uniform_(each.weight.data)
             each.bias.data.zero_()
 
 
@@ -68,18 +70,18 @@ def main():
     parser.add_argument('--start_epoch',default=0,type=int,metavar='N',help='manual epoch number (useful to restart)')
     parser.add_argument('--train_batch',type=int,default=6,help='train batch size',metavar='N')
     parser.add_argument('--test_batch',type=int,default=6,help='test batch size',metavar='N')
-    parser.add_argument('--lr','--learning_rate',default=0.0008,type=float,help='initial learning rate',metavar='LR')
-    parser.add_argument('--lr_decay_rate',default=0.993,type=float)
+    parser.add_argument('--lr','--learning_rate',default=0.001,type=float,help='initial learning rate',metavar='LR')
+    parser.add_argument('--lr_decay_rate',default=0.99,type=float)
     parser.add_argument('--drop','--dropout',default=0.0,type=float,metavar='Dropout',help='Dropout ratio')
     parser.add_argument('--schedule',type=int,default=[100,300],nargs='+',help='Decrease learning rate at these epochs')
     parser.add_argument('--gamma',type=float,default=0.1,help='LR is multiplied by gamma on shedule')
     parser.add_argument('--momentum',default=0.9,type=float,metavar='M',help='momentum')
-    parser.add_argument('--weight_decay','--wd',default=2e-3,type=float,metavar='W',help='weight decay')
+    parser.add_argument('--weight_decay','--wd',default=1e-5,type=float,metavar='W',help='weight decay')
     
     # Checkpoint
     parser.add_argument('-c','--checkpoint',default='./checkpoint/',type=str,metavar='PATH',help='Path to save checkpoint')
     # parser.add_argument('--resume',default='',type=str,metavar='PATH',help='path to ltest checkpoint (default=None)')
-    parser.add_argument('--resume',default = './checkpoint/FSRNetwork_419.pth.tar',type=str)
+    parser.add_argument('--resume',default = './checkpoint/FSRNetwork_102.pth.tar',type=str)
 
     # Miscs
     parser.add_argument('--manualSeed',type=int,help='manual seed')
@@ -180,11 +182,11 @@ def main():
         # if epoch%20==0:
         lr = args.lr*args.lr_decay_rate**epoch
         # Optimizer
-        # optim = torch.optim.RMSprop(model.parameters(),lr =lr,weight_decay=args.weight_decay,alpha=0.99)
-        optim = torch.optim.RMSprop(
-            [{'params':base_params, 'lr':lr*0.01},
-             {'params':model._fine_sr_encoder.parameters(),'lr':lr,'weight_decay':args.weight_decay*2.0},
-             {'params':model._fine_sr_decoder.parameters(), 'lr':lr , 'weight_decay':args.weight_decay*2.0}],lr=lr,alpha=0.99,weight_decay=args.weight_decay)
+        optim = torch.optim.RMSprop(model.parameters(),lr =lr,weight_decay=args.weight_decay,alpha=0.99)
+        # optim = torch.optim.RMSprop(
+        #     [{'params':base_params, 'lr':lr},
+        #      {'params':model._fine_sr_encoder.parameters(),'lr':lr,'weight_decay':args.weight_decay*2.0},
+        #      {'params':model._fine_sr_decoder.parameters(), 'lr':lr , 'weight_decay':args.weight_decay*2.0}],lr=lr,alpha=0.99,weight_decay=args.weight_decay)
         # optim = torch.optim.RMSprop(
         #     [{'params':model._fine_sr_decoder.parameters(), 'lr':lr , 'weight_decay':args.weight_decay*10.0}],lr=lr,alpha=0.99,weight_decay=args.weight_decay)
 
@@ -228,8 +230,8 @@ def train(train_loader, model, criterion_mse, criterion_cross_entropy,criterion_
         # compute output
         coarse_out, out_sr, out_landmark, out_lbl = model(batch_lr_img)
         # pdb.set_trace()
-        loss = (5.*criterion_mse(out_sr, batch_sr_img) + 2.*criterion_mse(coarse_out, batch_sr_img) + \
-               criterion_landmark(out_landmark,batch_landmark) + 5.*criterion_cross_entropy(out_lbl, batch_lbl))/(2.0*train_batch)
+        loss = (5.*criterion_mse(out_sr, batch_sr_img) + 5.*criterion_mse(coarse_out, batch_sr_img) + \
+               criterion_landmark(out_landmark,batch_landmark) + criterion_cross_entropy(out_lbl, batch_lbl))/(2.0*train_batch)
         # pdb.set_trace() 
         
         ## ---------------------------------------------------------------------------
@@ -268,11 +270,13 @@ def train(train_loader, model, criterion_mse, criterion_cross_entropy,criterion_
         if count% 200 ==0:
             ## count = 0
             #rand_id = random.randint(0, 4)
-            random_img, random_landmark, random_parsing,random_coarse = out_sr[0], out_landmark[0], out_lbl[0],coarse_out[0]
+            random_img, random_landmark, random_parsing,random_coarse,sr_img,lr_img = out_sr[0], out_landmark[0], out_lbl[0],coarse_out[0],batch_sr_img[0],batch_lr_img[0]
             ## pdb.set_trace()
             random_img, random_landmark, random_parsing,random_coarse= random_img.detach().cpu().numpy(), random_landmark.detach().cpu().numpy(), random_parsing.max(dim=0)[1].detach().cpu().numpy(), random_coarse.detach().cpu().numpy()
+            sr_img = sr_img.detach().cpu().numpy()
+            lr_img = lr_img.detach().cpu().numpy()
             ## pdb.set_trace()
-            visualize.save_image(random_coarse,random_img, random_landmark, random_parsing, epoch,if_train=True,count=int(count/300))
+            visualize.save_image(random_coarse,random_img, random_landmark, random_parsing,lr_img,sr_img, epoch,if_train=True,count=int(count/200))
             ##-----------------------------------------------------------------------
             #visualize coarse network
             #random_coarse = coarse_out[0]
@@ -312,7 +316,7 @@ def test(test_loader, model, criterion_mse,criterion_cross_entropy, criterion_la
             
             # compute output
             coarse_out, out_sr, out_landmark, out_lbl = model(batch_lr_img)
-            loss = (5.0*criterion_mse(out_sr, batch_sr_img) + 2.0*criterion_mse(coarse_out, batch_sr_img) + criterion_landmark(out_landmark,batch_landmark) + 5.0*criterion_cross_entropy(out_lbl, batch_lbl))/(2.0*test_batch)
+            loss = (7.0*criterion_mse(out_sr, batch_sr_img) + 7.0*criterion_mse(coarse_out, batch_sr_img) + criterion_landmark(out_landmark,batch_landmark) + criterion_cross_entropy(out_lbl, batch_lbl))/(2.0*test_batch)
              
             # ---------------------------------------------------------------------------
             #train coarse sr network 
@@ -326,12 +330,19 @@ def test(test_loader, model, criterion_mse,criterion_cross_entropy, criterion_la
             losses.update(loss.data, batch_lr_img.size(0))
 
             count += 1
-            if count%10 ==0:
+            if count%90 ==0:
                 #rand_id = random.randint(0, 4)
                 ## count = 0
-                random_img, random_landmark, random_parsing,random_coarse = out_sr[0], out_landmark[0], out_lbl[0] , coarse_out[0]
+                random_img, random_landmark, random_parsing, random_coarse, sr_img, lr_img = out_sr[0], out_landmark[0], \
+                                                                                             out_lbl[0], coarse_out[0], \
+                                                                                             batch_sr_img[0], \
+                                                                                             batch_lr_img[0]
                 random_img, random_landmark, random_parsing ,random_coarse= random_img.detach().cpu().numpy(), random_landmark.detach().cpu().numpy(), random_parsing.max(dim=0)[1].detach().cpu().numpy() , random_coarse.detach().cpu().numpy()
-                visualize.save_image(random_coarse,random_img, random_landmark, random_parsing, epoch,if_train=False,count=int(count/10))
+                sr_img = sr_img.detach().cpu().numpy()
+                lr_img = lr_img.detach().cpu().numpy()
+
+                visualize.save_image(random_coarse, random_img, random_landmark, random_parsing, lr_img, sr_img, epoch,
+                                     if_train=False, count=int(count / 90))
 
                 ##-----------------------------------------------------------------------
                 ##visualize coarse network

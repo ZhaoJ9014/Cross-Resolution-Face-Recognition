@@ -11,7 +11,7 @@ class MSELossFunc(nn.Module):
         # self.target = target
         
     def forward(self,input,target):
-        loss = torch.mean((input.float()-target.float())**2)*3.0
+        loss = torch.mean(torch.pow((input.float()-target.float()),2))*97.0
         return loss
 
 class MSELoss_Landmark(nn.Module):
