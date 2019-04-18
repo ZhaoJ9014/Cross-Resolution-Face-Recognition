@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import math
 import torch.nn.functional as F
-from tensorboardX import SummaryWriter
 from torch.autograd import Variable
 
 import pdb
