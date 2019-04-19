@@ -277,7 +277,7 @@ class Prior_Estimation_Network(nn.Module):
         self.hg = Hourglass(planes=64,depth=4,block=Bottleneck,num_blocks=2)
         self.dropout = nn.Dropout2d(p=0.5,inplace=True)
         self.fc = nn.Conv2d(in_channels=128, out_channels=11, kernel_size=1, bias=True)
-        self.fc_landmark = nn.Conv2d(in_channels=128,out_channels=97,kernel_size=1,bias=True)
+        self.fc_landmark = nn.Conv2d(in_channels=128,out_channels=194,kernel_size=1,bias=True)
         # self.fc_landmark1 = nn.Conv2d(in_channels=128,out_channels=128,kernel_size=1,bias=False)
         # self.landmark_fc = nn.Linear(in_features=112*112*11,out_features=194*2)
 
