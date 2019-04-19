@@ -26,7 +26,7 @@ class HelenLoader(data.Dataset):
     """
     def __init__(
             self,
-            # parsing_root='./face_dataset/SmithCVPR2013_dataset_original/labels_aligned/',
+            # parsing_root='/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original/labels_aligned_renew_v/',
             target_path='/media/hyo/文档/Dataset/face_dataset_v2/SmithCVPR2013_dataset_original/Segmentation/',
             helen_root='/media/hyo/文档/Dataset/face_dataset_v2/',
             landmark_root='/media/hyo/文档/Dataset/face_dataset_v2/xixixi_v2.csv',
@@ -53,7 +53,7 @@ class HelenLoader(data.Dataset):
         self.tf = transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+                transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),
             ]
         )
         
@@ -111,7 +111,7 @@ class HelenLoader(data.Dataset):
         landmark1 = []
         n = np.shape(landmark)[0]
         for i in range(n):
-            if i%2==0:
+            if i%1==0:
                 landmark[i,:] = np.dot(self.rotate_matrix(-random_angle),landmark[i,:]-56)+56
                 landmark1.append(landmark[i,:])
 
@@ -165,16 +165,16 @@ class HelenLoader(data.Dataset):
         return np.asarray(
             [
                 [255, 255, 255],
-                [128, 0, 0],
-                [0, 128, 0],
-                [128, 128, 0],
+                [255, 182, 147],
+                [128, 128, 192],
+                [192, 0, 0],
+                [0, 0, 128],
+                [0, 142, 64],
+                [255, 255, 0],
                 [128, 0, 128],
-                [0, 128, 128],
-                [128, 128, 128],
-                [64, 0, 128],
-                [0, 64, 0],
-                [0, 192, 0],
-                [0, 64, 128],
+                [255, 128, 255],
+                [255, 0, 0],
+                [79, 39, 0],
             ]
         )
     
@@ -254,12 +254,12 @@ class HelenLoader(data.Dataset):
                 label = int(lbl[-6:-4])     # 0~ 10
                 img = Image.open(pjoin(parsing_path,sub,lbl))
                 img_array = np.array(img)
-                result[img_array>150] = label
+                result[img_array>140] = label
             # result = result - 1
             lbl_new = m.toimage(result,high=result.max(),low=result.min())
             temp = np.array(lbl_new)
             print(img_name)
-            m.imsave(pjoin('./face_dataset/SmithCVPR2013_dataset_original','Segmentation',img_name),lbl_new)
+            m.imsave(pjoin('/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original','Segmentation_v2',img_name),lbl_new)
         
         # for img in os.listdir(pjoin('/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original','Segmentation')):
         #     img_path = pjoin('/media/hyo/文档/Dataset/SmithCVPR2013_dataset_original','Segmentation',img)
@@ -278,7 +278,7 @@ class HelenLoader(data.Dataset):
 if __name__=='__main__':
     h = HelenLoader()
     # h.setup_annotation()
-    parsing_img = Image.open('/media/hyo/文档/Dataset/face_dataset_v2/SmithCVPR2013_dataset_original/Segmentation/10405146_1.png')
+    parsing_img = Image.open('/media/hyo/文档/Dataset/face_dataset_v3/SmithCVPR2013_dataset_original/Segmentation/10405146_1.png')
     random_angle = random.randint(-1, 1)
     parsing_img = parsing_img.rotate(0)
     labelmask = np.array(parsing_img)
